@@ -9,3 +9,4 @@ devel/
 # VS Code
 .vscode/
 .vscode
+*.pyc
