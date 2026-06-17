@@ -32,16 +32,16 @@ def generate_launch_description():
     )
 
     # ------------------- MoveIt -------------------
-    moveit = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            os.path.join(
-                get_package_share_directory("panda_moveit"),
-                "launch",
-                "moveit.launch.py"
-            )
-        ),
-        launch_arguments={"is_sim": "True"}.items()
-    )
+    # moveit = IncludeLaunchDescription(
+    #     PythonLaunchDescriptionSource(
+    #         os.path.join(
+    #             get_package_share_directory("panda_moveit"),
+    #             "launch",
+    #             "moveit.launch.py"
+    #         )
+    #     ),
+    #     launch_arguments={"is_sim": "True"}.items()
+    # )
 
     # ------------------- Vision Node -------------------
     vision_node = Node(
@@ -52,20 +52,20 @@ def generate_launch_description():
     )
 
     # ------------------- MoveIt Color Picker Node -------------------
-    color_picker_node = Node(
-        package="pymoveit2",
-        executable="pick_and_place.py",
-        name="pick_and_place",
-        output="screen",
-        parameters=[
-            {"target_color": "B"}  # {"target_color": "R"}, {"target_color": "G"}
-        ]
-    )
+    # color_picker_node = Node(
+    #     package="pymoveit2",
+    #     executable="pick_and_place.py",
+    #     name="pick_and_place",
+    #     output="screen",
+    #     parameters=[
+    #         {"target_color": "B"}  # {"target_color": "R"}, {"target_color": "G"}
+    #     ]
+    # )
 
     return LaunchDescription([
         gazebo,
         controller,
-        moveit,
+        # moveit,
         vision_node,
         # color_picker_node,
     ])
