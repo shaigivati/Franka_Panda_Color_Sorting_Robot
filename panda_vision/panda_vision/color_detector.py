@@ -121,7 +121,7 @@ class ColorDetector(Node):
                         # Publish color ID + coordinates in panda_link0 frame
                         msg_str = f"{color_id},{pt_base[0]:.3f},{pt_base[1]:.3f},{pt_base[2]:.3f}"
                         self.coords_pub.publish(String(data=msg_str))
-                        self.get_logger().info(msg_str)
+                        # self.get_logger().info(msg_str)
                         
                     except (tf2_ros.LookupException, 
                             tf2_ros.ConnectivityException, 

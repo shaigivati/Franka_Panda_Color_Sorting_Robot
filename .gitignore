@@ -9,4 +9,5 @@ devel/
 # VS Code
 .vscode/
 .vscode
-*.pyc
+**/*.pyc
+docs/*

@@ -12,6 +12,9 @@ from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 
 from controller_manager_msgs.srv import ListControllers
 
+import math
+import numpy as np
+from std_msgs.msg import String
 
 class PolicyController(Node):
     ARM_JOINTS = [
@@ -29,6 +32,14 @@ class PolicyController(Node):
     ]
 
     INITIAL_GRIPPER_POSE = [0.04, 0.04]
+
+    ACTION_SCALE = 0.03
+
+    ARM_LOWER_LIMITS = [-2.8973, -1.7628, -2.8973, -3.0718, -2.8973, -0.0175, -2.8973]
+    ARM_UPPER_LIMITS = [ 2.8973,  1.7628,  2.8973, -0.0698,  2.8973,  3.7525,  2.8973]
+
+    GRIPPER_LOWER_LIMITS = [0.0, 0.0]
+    GRIPPER_UPPER_LIMITS = [0.04, 0.04]
 
     def __init__(self):
         super().__init__("policy_controller")
@@ -51,6 +62,8 @@ class PolicyController(Node):
         self.arm_pub = None
         self.gripper_pub = None
 
+        self.red_object_position = None
+
     def setup_ros_interfaces(self):
         self.create_subscription(
             JointState,
@@ -68,6 +81,13 @@ class PolicyController(Node):
         self.gripper_pub = self.create_publisher(
             JointTrajectory,
             self.gripper_command_topic,
+            10,
+        )
+
+        self.create_subscription(
+            String,
+            "/color_coordinates",
+            self.on_color_coordinates,
             10,
         )
 
@@ -203,21 +223,171 @@ class PolicyController(Node):
 
         return True
 
+    def on_color_coordinates(self, msg):
+        parts = msg.data.split(",")
+
+        if len(parts) != 4:
+            return
+
+        color_id = parts[0]
+
+        if color_id != "R":
+            return
+
+        try:
+            self.red_object_position = [
+                float(parts[1]),
+                float(parts[2]),
+                float(parts[3]),
+            ]
+        except ValueError:
+            return
+
     def build_observation(self):
-        pass
+        if self.joint_state is None:
+            return None
+
+        if self.red_object_position is None:
+            return None
+
+        joint_map = dict(zip(self.joint_state.name, self.joint_state.position))
+        velocity_map = dict(zip(self.joint_state.name, self.joint_state.velocity))
+
+        joint_names = self.ARM_JOINTS + self.GRIPPER_JOINTS
+
+        joint_positions = []
+        joint_velocities = []
+
+        for joint_name in joint_names:
+            if joint_name not in joint_map:
+                return None
+
+            pos = joint_map[joint_name]
+            vel = velocity_map.get(joint_name, 0.0)
+
+            if math.isnan(pos):
+                pos = 0.0
+
+            if math.isnan(vel):
+                vel = 0.0
+
+            joint_positions.append(pos)
+            joint_velocities.append(vel)
+
+        object_pose = [
+            self.red_object_position[0],
+            self.red_object_position[1],
+            0.055,
+            1.0, 0.0, 0.0, 0.0,
+        ]
+
+        ee_position = [
+            0.0,
+            0.0,
+            0.0,
+        ]
+
+        obs = (
+            joint_positions
+            + joint_velocities
+            + object_pose
+            + ee_position
+            + self.last_action
+        )
+
+        if len(obs) != 36:
+            self.get_logger().error(f"Observation length is {len(obs)}, expected 36")
+            return None
+        return np.array([obs], dtype=np.float32)
 
     def run_policy(self, observation):
-        pass
+        if self.policy is None:
+            return None
+
+        outputs = self.policy.run(
+            [self.output_name],
+            {self.input_name: observation},
+        )
+
+        actions = outputs[0][0]
+
+        if len(actions) != 8:
+            self.get_logger().error(f"Expected 8 actions, got {len(actions)}")
+            return None
+
+        return actions
 
     def map_actions(self, actions):
-        pass
+        if self.joint_state is None:
+            return None, None
+
+        current = dict(zip(self.joint_state.name, self.joint_state.position))
+
+        arm_targets = []
+        for i, joint_name in enumerate(self.ARM_JOINTS):
+            if joint_name not in current:
+                return None, None
+
+            target = current[joint_name] + self.ACTION_SCALE * float(actions[i])
+            target = float(np.clip(
+                target,
+                self.ARM_LOWER_LIMITS[i],
+                self.ARM_UPPER_LIMITS[i],
+            ))
+            arm_targets.append(target)
+
+        gripper_action = float(actions[7])
+        gripper_delta = self.ACTION_SCALE * gripper_action
+
+        gripper_targets = []
+        for i, joint_name in enumerate(self.GRIPPER_JOINTS):
+            if joint_name not in current:
+                return None, None
+
+            target = current[joint_name] + gripper_delta
+            target = float(np.clip(
+                target,
+                self.GRIPPER_LOWER_LIMITS[i],
+                self.GRIPPER_UPPER_LIMITS[i],
+            ))
+            gripper_targets.append(target)
+
+        self.last_action = [float(x) for x in actions]
+
+        return arm_targets, gripper_targets
 
     def publish_command(self, arm_targets, gripper_targets):
-        pass
+        arm_msg = self.build_trajectory(
+            self.ARM_JOINTS,
+            arm_targets,
+            duration_sec=0.3,
+        )
+
+        gripper_msg = self.build_trajectory(
+            self.GRIPPER_JOINTS,
+            gripper_targets,
+            duration_sec=0.3,
+        )
+
+        self.arm_pub.publish(arm_msg)
+        self.gripper_pub.publish(gripper_msg)
+
+        self.get_logger().info("Published one policy command")
 
     def control_loop(self):
-        pass
+        obs = self.build_observation()
+        if obs is None:
+            return
 
+        actions = self.run_policy(obs)
+        if actions is None:
+            return
+
+        arm_targets, gripper_targets = self.map_actions(actions)
+        if arm_targets is None or gripper_targets is None:
+            return
+
+        self.publish_command(arm_targets, gripper_targets)
 
 def main(args=None):
     rclpy.init(args=args)
@@ -225,13 +395,18 @@ def main(args=None):
 
     node.setup_ros_interfaces()
     node.load_policy()
-    node.send_initial_pose()
 
+    if not node.send_initial_pose():
+        node.destroy_node()
+        rclpy.shutdown()
+        return
+
+    node.create_timer(0.5, node.control_loop)
+        
     rclpy.spin(node)
 
     node.destroy_node()
     rclpy.shutdown()
-
 
 if __name__ == "__main__":
     main()
