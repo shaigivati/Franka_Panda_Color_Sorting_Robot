@@ -31,18 +31,9 @@ class PolicyController(Node):
     def __init__(self):
         super().__init__("policy_controller")
 
-        self.declare_parameter(
-            "policy_path",
-            "/home/shaigiv/franka_ws/src/panda_controller/policy/policy.onnx",
-        )
-        self.declare_parameter(
-            "arm_command_topic",
-            "/panda_arm_controller/joint_trajectory",
-        )
-        self.declare_parameter(
-            "gripper_command_topic",
-            "/panda_gripper_controller/joint_trajectory",
-        )
+        self.declare_parameter("policy_path","/home/shaigiv/franka_ws/src/panda_controller/policy/policy.onnx")
+        self.declare_parameter("arm_command_topic", "/arm_controller/joint_trajectory")
+        self.declare_parameter("gripper_command_topic", "/gripper_controller/joint_trajectory")
 
         self.policy_path = self.get_parameter("policy_path").value
         self.arm_command_topic = self.get_parameter("arm_command_topic").value
