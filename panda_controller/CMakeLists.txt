@@ -43,7 +43,7 @@ ament_python_install_package(${PROJECT_NAME})
 
 # Install Python executables
 install(PROGRAMS
-  ${PROJECT_NAME}/slider_controller.py
+  ${PROJECT_NAME}/policy_controller.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

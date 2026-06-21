@@ -1,9 +1,10 @@
 import os
+
 from launch import LaunchDescription
-from launch.actions import IncludeLaunchDescription
+from launch.actions import IncludeLaunchDescription, TimerAction
+from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch_ros.actions import Node
 from ament_index_python.packages import get_package_share_directory
-from launch.launch_description_sources import PythonLaunchDescriptionSource
 
 
 def generate_launch_description():
@@ -51,6 +52,15 @@ def generate_launch_description():
         output="screen"
     )
 
+    # ------------------- Policy Controller -------------------
+    policy_controller = Node(
+        package="panda_controller",
+        executable="policy_controller.py",
+        name="policy_controller",
+        output="screen"
+    )
+    
+
     # ------------------- MoveIt Color Picker Node -------------------
     # color_picker_node = Node(
     #     package="pymoveit2",
@@ -66,6 +76,7 @@ def generate_launch_description():
         gazebo,
         controller,
         # moveit,
-        vision_node,
+        #vision_node,
+        policy_controller,
         # color_picker_node,
     ])
