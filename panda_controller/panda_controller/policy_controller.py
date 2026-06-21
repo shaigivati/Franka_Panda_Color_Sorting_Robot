@@ -244,6 +244,10 @@ class PolicyController(Node):
             return
 
     def build_observation(self):
+    # Expected ONNX observation layout:
+    # 9 joint positions + 9 joint velocities + 7 object pose
+    # + 3 end-effector position + 8 previous actions = 36
+
         if self.joint_state is None:
             return None
 
@@ -277,8 +281,8 @@ class PolicyController(Node):
         object_pose = [
             self.red_object_position[0],
             self.red_object_position[1],
-            0.055,
-            1.0, 0.0, 0.0, 0.0,
+            0.055, # Detector Z is not reliable; use IsaacLab cube height.
+            1.0, 0.0, 0.0, 0.0, # Identity orientation: qw, qx, qy, qz
         ]
 
         ee_position = [
@@ -318,6 +322,8 @@ class PolicyController(Node):
         return actions
 
     def map_actions(self, actions):
+    # Policy output is treated as joint-position deltas.
+    # ACTION_SCALE controls how large each policy step is.
         if self.joint_state is None:
             return None, None
 
@@ -372,7 +378,6 @@ class PolicyController(Node):
         self.arm_pub.publish(arm_msg)
         self.gripper_pub.publish(gripper_msg)
 
-        self.get_logger().info("Published one policy command")
 
     def control_loop(self):
         obs = self.build_observation()
