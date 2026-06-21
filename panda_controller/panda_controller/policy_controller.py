@@ -10,6 +10,8 @@ from builtin_interfaces.msg import Duration
 from sensor_msgs.msg import JointState
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 
+from controller_manager_msgs.srv import ListControllers
+
 
 class PolicyController(Node):
     ARM_JOINTS = [
@@ -103,7 +105,43 @@ class PolicyController(Node):
             f"{self.output_name}{output_shape}"
         )
 
+    def wait_for_active_controllers(self, timeout_sec=15.0):
+        client = self.create_client(ListControllers, "/controller_manager/list_controllers")
+
+        if not client.wait_for_service(timeout_sec=timeout_sec):
+            self.get_logger().error("controller_manager service not available")
+            return False
+
+        deadline = time.monotonic() + timeout_sec
+
+        while time.monotonic() < deadline:
+            future = client.call_async(ListControllers.Request())
+            rclpy.spin_until_future_complete(self, future, timeout_sec=1.0)
+
+            if future.result() is None:
+                continue
+
+            controllers = future.result().controller
+            states = {c.name: c.state for c in controllers}
+
+            arm_active = states.get("arm_controller") == "active"
+            gripper_active = states.get("gripper_controller") == "active"
+            jsb_active = states.get("joint_state_broadcaster") == "active"
+
+            if arm_active and gripper_active and jsb_active:
+                self.get_logger().info("Controllers are active")
+                return True
+
+            time.sleep(0.2)
+
+        self.get_logger().error("Controllers did not become active")
+        return False
+
     def send_initial_pose(self):
+
+        if not self.wait_for_active_controllers():
+            return False
+
         arm_msg = self.build_trajectory(
             self.ARM_JOINTS,
             self.INITIAL_ARM_POSE,

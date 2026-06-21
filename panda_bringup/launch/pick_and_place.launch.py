@@ -32,18 +32,6 @@ def generate_launch_description():
         launch_arguments={"is_sim": "True"}.items()
     )
 
-    # ------------------- MoveIt -------------------
-    # moveit = IncludeLaunchDescription(
-    #     PythonLaunchDescriptionSource(
-    #         os.path.join(
-    #             get_package_share_directory("panda_moveit"),
-    #             "launch",
-    #             "moveit.launch.py"
-    #         )
-    #     ),
-    #     launch_arguments={"is_sim": "True"}.items()
-    # )
-
     # ------------------- Vision Node -------------------
     vision_node = Node(
         package="panda_vision",
@@ -75,8 +63,7 @@ def generate_launch_description():
     return LaunchDescription([
         gazebo,
         controller,
-        # moveit,
-        #vision_node,
+        vision_node,
         policy_controller,
-        # color_picker_node,
+       # color_picker_node,
     ])
